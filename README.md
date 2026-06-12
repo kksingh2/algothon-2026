@@ -1,23 +1,22 @@
 # algothon 2026
 
-my bot for the imperial college algothon, february to march 2026. finished top 10 in london.
+a trading bot i wrote for the imperial college algothon, a 24 hour algorithmic trading competition. finished top 10 in london.
 
-the exchange had 8 products driven by live london data:
+the cool thing about this exchange was that instead of stock prices, the 8 things you could trade were tied to real london data:
 
 - thames tide level
-- london weather
-- heathrow arrivals and departures
-- an etf basket of three of them
-- an options-style product on the etf
+- london temperature and humidity
+- arrivals and departures at heathrow
+- an etf which was just a basket of three of the above
+- an options-style product on top of the etf
 
-## what the bot does
+how the bot trades:
 
-each loop:
-
-1. pull the latest data for each product (cached so we dont hit the api rate limit)
-2. work out a fair value for each product from the data
-3. quote a buy and a sell around that fair value, with a small lean against my current position so it gets back to flat
-4. if the etf price moves too far from the sum of its parts, trade both sides to close the gap
+1. every loop it fetches the latest london data. the apis have rate limits so it caches each response for a short time instead of asking again every second.
+2. for each product, it works out what i think the fair price should be from the data.
+3. it puts in a price to buy slightly below the fair price and a price to sell slightly above. this is called market making, you make a tiny bit each time the other side trades with you.
+4. if i build up too much of one product, the bot nudges its prices down a bit so it sells some back. this keeps me from sitting on a big risky position.
+5. the etf is just a basket of three other products, so if the etf trades too far away from the sum of those three, the bot trades both sides at once to close the gap. this is called arbitrage.
 
 ## run
 
@@ -25,4 +24,4 @@ each loop:
 python finalbot.py
 ```
 
-needs your exchange credentials and the data feeds the bot was wired up to.
+needs the exchange credentials and the data feeds the bot was wired up to during the competition.
