@@ -119,5 +119,5 @@ If I revisited this, the highest-value changes would be:
   `theo` reacts smoothly to noisy readings instead of jumping with the
   latest data point.
 - Hedge `LON_FLY` dynamically against `LON_ETF` rather than holding a
-  static position, so the strategy is robust to a wider range of
+  static position, so the strategy stays sensible across a wider range of
   settlement levels.
