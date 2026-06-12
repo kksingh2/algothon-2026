@@ -1,35 +1,3 @@
-"""
-Imperial Algothon 2026 - FinalBot v2
-====================================
-
-Market-making and ETF-component arbitrage bot for the CMI Exchange,
-written for the Imperial College Algothon competition (Feb/Mar 2026).
-
-The bot trades 8 products driven by real-world London data:
-
-    Thames tidal levels   : TIDE_SPOT, TIDE_SWING
-    London weather        : WX_SPOT,   WX_SUM
-    Heathrow flights      : LHR_COUNT, LHR_INDEX
-    Derived               : LON_ETF (basket of TIDE_SPOT + WX_SPOT + LHR_COUNT)
-                            LON_FLY (options structure on LON_ETF)
-
-Strategy
---------
-1. Cache every external API call behind a TTL (the flight API only
-   permits ~150 requests per month, so this is non-negotiable).
-2. Compute a data-driven fair value (theo) for each product using the
-   competition settlement formulas.
-3. Quote a two-sided market around theo with an inventory lean that
-   pushes prices to flatten any built-up position.
-4. Run an ETF-vs-components arbitrage on every cycle, taking liquidity
-   when the basket trades through fair value by more than 20 ticks.
-
-Usage
------
-    my_bot = FinalBot(EXCHANGE_URL, USERNAME, PASSWORD)
-    my_bot.run_session()
-"""
-
 import math
 import time
 
@@ -42,23 +10,14 @@ from bot_template import (
     Side,
 )
 
-
-# =================================================================
-# Caching layer
-# =================================================================
-# External APIs are rate limited. Every fetch goes through one of
-# these wrappers, which return a cached copy if the most recent call
-# is still within its TTL window.
-
+# cache api responses so we dont hit the rate limit
 _cache = {
     "tide": None,    "tide_ts": 0,
     "wx": None,      "wx_ts": 0,
     "flights": None, "flights_ts": 0,
 }
 
-
 def cached_thames(ttl=60):
-    """Return Thames tidal data, refreshed at most every `ttl` seconds."""
     if time.time() - _cache["tide_ts"] < ttl and _cache["tide"] is not None:
         return _cache["tide"]
     try:
@@ -68,9 +27,7 @@ def cached_thames(ttl=60):
     except Exception:
         return _cache["tide"]
 
-
 def cached_weather(ttl=60):
-    """Return London weather data, refreshed at most every `ttl` seconds."""
     if time.time() - _cache["wx_ts"] < ttl and _cache["wx"] is not None:
         return _cache["wx"]
     try:
@@ -80,9 +37,7 @@ def cached_weather(ttl=60):
     except Exception:
         return _cache["wx"]
 
-
 def cached_flights(ttl=600):
-    """Return Heathrow flight data with a 10-minute TTL to preserve API quota."""
     if time.time() - _cache["flights_ts"] < ttl and _cache["flights"] is not None:
         return _cache["flights"]
     try:
@@ -92,24 +47,16 @@ def cached_flights(ttl=600):
     except Exception:
         return _cache["flights"]
 
-
-# =================================================================
 # Helpers
-# =================================================================
 def _bba(bot, sym):
-    """Best bid and best ask, excluding the bot's own resting volume."""
     ob = bot.get_orderbook(sym)
     bids = [o.price for o in ob.buy_orders if o.volume - o.own_volume > 0]
     asks = [o.price for o in ob.sell_orders if o.volume - o.own_volume > 0]
     return (max(bids) if bids else None,
             min(asks) if asks else None)
 
-
-# =================================================================
 # FinalBot
-# =================================================================
 class FinalBot(BaseBot):
-    """Two-sided market maker with ETF arbitrage overlay."""
 
     SKIP = {"LON_FLY"}                   # held for settlement, do not requote
     QUOTE_PRODUCTS = {
@@ -139,7 +86,6 @@ class FinalBot(BaseBot):
 
     # Theo pricing ---------------------------------------------------
     def get_theo(self, symbol, info):
-        """Fair value from the competition settlement formulas."""
         try:
             if symbol == "TIDE_SPOT":
                 df = cached_thames()
@@ -222,13 +168,6 @@ class FinalBot(BaseBot):
 
     # ETF arbitrage --------------------------------------------------
     def run_etf_arb(self, pos):
-        """
-        Cross-product arbitrage between LON_ETF and its components.
-
-        If the ETF trades cheap to the basket of components, we buy ETF
-        and sell components. If it trades rich, we do the reverse. Both
-        legs are sent simultaneously so the position is always hedged.
-        """
         try:
             tb, ta = _bba(self, "TIDE_SPOT")
             wb, wa = _bba(self, "WX_SPOT")
@@ -269,13 +208,6 @@ class FinalBot(BaseBot):
 
     # ETF quoting ----------------------------------------------------
     def quote_etf(self, pos, products):
-        """
-        Quote LON_ETF using a fair value implied by the components.
-
-        Uses a tighter spread than the individual products because the
-        component-implied price is a more reliable signal than any
-        single product's data feed.
-        """
         try:
             tb, ta = _bba(self, "TIDE_SPOT")
             wb, wa = _bba(self, "WX_SPOT")
@@ -370,10 +302,7 @@ class FinalBot(BaseBot):
             self.stop()
             print("FinalBot v2 stopped.")
 
-
-# =================================================================
 # Launcher
-# =================================================================
 if __name__ == "__main__":
     # EXCHANGE_URL, USERNAME, PASSWORD are provided by the competition harness.
     my_bot = FinalBot(EXCHANGE_URL, USERNAME, PASSWORD)
